@@ -40,7 +40,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13
 .tab-close{font-size:11px;color:var(--text3);padding:1px 3px;border-radius:3px}
 .tab-close:hover{background:var(--bg4);color:var(--red)}
 .content-area{flex:1;overflow-y:auto;background:var(--bg)}
-.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:14px 20px;border-bottom:1px solid var(--border)}
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 20px;border-bottom:1px solid var(--border)}
 .stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px}
 .stat-n{font-size:22px;font-weight:600}
 .stat-l{font-size:11px;color:var(--text3);margin-top:3px}
@@ -170,6 +170,7 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     <div class="modal-title" id="modal-page-title">Thêm page mới</div>
     <div class="form-grid">
       <div class="form-group"><label>ID Page *</label><input id="fp-id" placeholder="100082341"></div>
+      <div class="form-group"><label>Tên Page</label><input id="fp-name" placeholder="WildBloom America"></div>
       <div class="form-group"><label>Link Page *</label><input id="fp-link" placeholder="fb.com/shopathena"></div>
       <div class="form-group"><label>Tên Instagram</label><input id="fp-ig-name" placeholder="@shopathena"></div>
       <div class="form-group"><label>Link Instagram</label><input id="fp-ig-link" placeholder="instagram.com/shopathena"></div>
@@ -594,7 +595,8 @@ function renderSheetView(area) {
 
   // Stats
   var sr = document.createElement('div'); sr.className='stats-row';
-  var stats = [{n:total,l:'Tổng page',c:''},{n:dd,l:'Đang đăng',c:'var(--green)'},{n:xong,l:'Đăng xong',c:'var(--text2)'},{n:die,l:'Die',c:'var(--red)'},{n:soon,l:'Sắp hết hạn',c:'var(--amber)'}];
+  var totalAccs=DB.accs.length;
+  var stats = [{n:total,l:'Tổng page',c:''},{n:dd,l:'Đang đăng',c:'var(--green)'},{n:xong,l:'Đăng xong',c:'var(--text2)'},{n:die,l:'Die',c:'var(--red)'},{n:soon,l:'Sắp hết hạn',c:'var(--amber)'},{n:totalAccs,l:'Tổng acc FB',c:'var(--purple-text)'}];
   stats.forEach(function(s){
     var card = document.createElement('div'); card.className='stat';
     var num = document.createElement('div'); num.className='stat-n'; num.textContent=s.n; if(s.c) num.style.color=s.c;
@@ -654,9 +656,9 @@ function renderSheetView(area) {
   var ckAll=document.createElement('input'); ckAll.type='checkbox'; ckAll.id='ck-all';
   ckAll.onchange=function(){ document.querySelectorAll('.row-ck').forEach(function(c){ c.checked=ckAll.checked; }); updateBulkBar(); };
   thCk.appendChild(ckAll); htr.appendChild(thCk);
-  ['','ID Page','Link Page','Instagram','Trạng thái','Sản phẩm','Bắt đầu','Kết thúc','Thao tác'].forEach(function(h,i){
+  ['','ID Page','Tên Page','Link Page','Instagram','Trạng thái','Sản phẩm','Bắt đầu','Kết thúc','Thao tác'].forEach(function(h,i){
     var th = document.createElement('th'); th.textContent=h;
-    var ws = [28,100,130,115,95,0,88,100,62];
+    var ws = [28,90,110,120,100,85,100,80,90,62];
     if(ws[i]) th.style.width=ws[i]+'px';
     htr.appendChild(th);
   });
@@ -699,6 +701,9 @@ function renderPageRows(filtered, allPages) {
       },
       function(){
         var td=document.createElement('td'); td.style.cssText='font-family:var(--mono);font-weight:500'; td.textContent=p.id; return td;
+      },
+      function(){
+        var td=document.createElement('td'); td.className='clip'; td.style.fontWeight='500'; td.textContent=p.name||'—'; return td;
       },
       function(){
         var td=document.createElement('td'); td.className='clip';
@@ -832,7 +837,7 @@ function searchPages(q) {
   var pages=DB.pages[DB.activeSheet]||[];
   q=q.toLowerCase();
   var filtered=pages.filter(function(p){
-    return !q||p.id.toLowerCase().includes(q)||(p.link||'').toLowerCase().includes(q)||(p.product||'').toLowerCase().includes(q)||(p.igname||'').toLowerCase().includes(q);
+    return !q||p.id.toLowerCase().includes(q)||(p.name||'').toLowerCase().includes(q)||(p.link||'').toLowerCase().includes(q)||(p.product||'').toLowerCase().includes(q)||(p.igname||'').toLowerCase().includes(q);
   });
   renderPageRows(filtered,pages);
 }
@@ -840,7 +845,7 @@ function searchPages(q) {
 function openAddPage() {
   editPageIdx=null;
   document.getElementById('modal-page-title').textContent='Thêm page mới';
-  ['fp-id','fp-link','fp-ig-name','fp-ig-link','fp-product'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['fp-id','fp-name','fp-link','fp-ig-name','fp-ig-link','fp-product'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('fp-status').value='Đang đăng';
   document.getElementById('fp-start').value='';
   document.getElementById('fp-end').value='';
@@ -852,6 +857,7 @@ function openEditPage(idx) {
   if(!p) return;
   document.getElementById('modal-page-title').textContent='Sửa page';
   document.getElementById('fp-id').value=p.id;
+  document.getElementById('fp-name').value=p.name||'';
   document.getElementById('fp-link').value=p.link;
   document.getElementById('fp-ig-name').value=p.igname||'';
   document.getElementById('fp-ig-link').value=p.iglink||'';
@@ -867,7 +873,7 @@ function savePage() {
   if(!id||!link) return showToast('ID Page và Link là bắt buộc','error');
   var sheet=DB.activeSheet;
   if(!DB.pages[sheet]) DB.pages[sheet]=[];
-  var page={id:id,link:link,igname:document.getElementById('fp-ig-name').value.trim(),iglink:document.getElementById('fp-ig-link').value.trim(),status:document.getElementById('fp-status').value,product:document.getElementById('fp-product').value.trim(),start:document.getElementById('fp-start').value,end:document.getElementById('fp-end').value,admins:[]};
+  var page={id:id,name:document.getElementById('fp-name').value.trim(),link:link,igname:document.getElementById('fp-ig-name').value.trim(),iglink:document.getElementById('fp-ig-link').value.trim(),status:document.getElementById('fp-status').value,product:document.getElementById('fp-product').value.trim(),start:document.getElementById('fp-start').value,end:document.getElementById('fp-end').value,admins:[]};
   if(editPageIdx!==null){ page.admins=DB.pages[sheet][editPageIdx].admins||[]; DB.pages[sheet][editPageIdx]=page; showToast('Đã cập nhật page','success'); }
   else { DB.pages[sheet].push(page); showToast('Đã thêm page','success'); }
   saveDB(); closeModal('modal-page'); renderContent();
