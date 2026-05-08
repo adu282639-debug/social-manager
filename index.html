@@ -427,7 +427,13 @@ function fbLoad() {
     showSyncStatus('loading');
     getDoc(doc(_fbDb, 'data', 'main')).then(function(snap) {
       if (snap.exists()) {
-        DB = JSON.parse(snap.data().payload);
+        var loaded = JSON.parse(snap.data().payload);
+        if (loaded && typeof loaded === 'object') {
+          DB = loaded;
+          if (!DB.accs) DB.accs = [];
+          if (!DB.pages) DB.pages = {};
+          if (!DB.sheets) DB.sheets = ['Tháng 5/2026'];
+        }
         localStorage.setItem('smdb_v2', JSON.stringify(DB));
         showSyncStatus('loaded');
         if (sessionStorage.getItem('sm_logged') === '1') renderAll();
@@ -487,6 +493,7 @@ window.loadDB = function loadDB() {
 }
 window.saveDB = function saveDB() {
   localStorage.setItem('smdb_v2', JSON.stringify(DB));
+  scheduleSave();
 }
 
 function doLogin() {
@@ -1091,7 +1098,7 @@ function renderAccRows(accs,type) {
     etd.innerHTML='<div class="empty-state"><div>👤</div>Chưa có tài khoản nào</div>';
     etr.appendChild(etd); tbody.appendChild(etr); return;
   }
-  accs.forEach(function(a){
+  accs.forEach(function(a, i){
     var realIdx=DB.accs.indexOf(a);
     var pages=getPagesForAcc(a.uid);
     var tr=document.createElement('tr');
@@ -1323,7 +1330,7 @@ function executeBulkImport() {
   var accs=parseBulkLines();
   if(!accs.length) return showToast('Không có dữ liệu hợp lệ','error');
   var added=0,dupes=0;
-  accs.forEach(function(a){
+  accs.forEach(function(a, i){
     if(DB.accs.find(function(x){ return x.uid===a.uid; })){ dupes++; return; }
     DB.accs.push(a); added++;
   });
@@ -1344,9 +1351,15 @@ function openSelectedLinks() {
   var opened = 0;
   cks.forEach(function(ck) {
     var p = pages[parseInt(ck.dataset.idx)];
-    if (p && p.link) { openLink(p.link); opened++; }
+    if (p && p.link) {
+      var url = p.link;
+      if (url.indexOf('http') !== 0) url = 'https://' + url;
+      window.open(url, '_blank');
+      opened++;
+    }
   });
-  showToast('Đã mở ' + opened + ' link','success');
+  if (opened === 0) showToast('Các page đã chọn chưa có link','error');
+  else showToast('Đã mở ' + opened + ' tab','success');
 }
 
 function bulkChangeStatus(status) {
@@ -1485,10 +1498,13 @@ function deleteAllDie() {
 }
 
 // loadDB and auto-login handled by Firebase module above
-// Fallback if Firebase module not loaded yet
-if (typeof DB !== 'undefined' && sessionStorage.getItem('sm_logged') === '1') {
+// Load localStorage first
+window.loadDB();
+// Auto-login if session active
+if (sessionStorage.getItem('sm_logged') === '1') {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  renderAll();
 }
 
 </script>
