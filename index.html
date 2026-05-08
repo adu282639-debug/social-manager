@@ -763,7 +763,20 @@ function renderPageRows(filtered, allPages) {
     // checkbox cell
     var tdCk=document.createElement('td');
     var ck=document.createElement('input'); ck.type='checkbox'; ck.className='row-ck'; ck.dataset.idx=realIdx;
-    ck.onclick=function(e){ e.stopPropagation(); updateBulkBar(); };
+    ck.onclick=(function(ri){ return function(e) {
+      e.stopPropagation();
+      if (e.shiftKey && window._lastPageCk !== undefined) {
+        var cks = Array.from(document.querySelectorAll('.row-ck'));
+        var a = cks.findIndex(function(c){ return parseInt(c.dataset.idx)===window._lastPageCk; });
+        var b = cks.findIndex(function(c){ return parseInt(c.dataset.idx)===ri; });
+        if (a >= 0 && b >= 0) {
+          var lo = Math.min(a,b), hi = Math.max(a,b);
+          for (var x=lo; x<=hi; x++) cks[x].checked = true;
+        }
+      }
+      window._lastPageCk = ri;
+      updateBulkBar();
+    }; })(realIdx);
     tdCk.appendChild(ck); tr.appendChild(tdCk);
 
     // STT cell
@@ -1171,6 +1184,8 @@ function renderAccView(area) {
   var bindBtn=document.createElement('button'); bindBtn.className='btn btn-sm'; bindBtn.style.cssText='border-color:var(--purple);color:var(--purple-text)';
   bindBtn.textContent='Gắn page đã chọn'; bindBtn.onclick=bulkBindAccToPage;
 
+  var switchTypeBtn=document.createElement('button'); switchTypeBtn.className='btn btn-sm'; switchTypeBtn.style.cssText='border-color:var(--amber);color:var(--amber-text)';
+  switchTypeBtn.textContent='⇄ Đổi loại acc'; switchTypeBtn.onclick=bulkSwitchAccType;
   var bulkLiveBtn=document.createElement('button'); bulkLiveBtn.className='btn btn-sm'; bulkLiveBtn.style.cssText='border-color:var(--green);color:var(--green-text)';
   bulkLiveBtn.textContent='→ Live'; bulkLiveBtn.onclick=function(){ bulkSetAccStatus('Live'); };
 
@@ -1183,7 +1198,7 @@ function renderAccView(area) {
   var cancelAccBtn=document.createElement('button'); cancelAccBtn.className='btn btn-sm'; cancelAccBtn.textContent='Bỏ chọn';
   cancelAccBtn.onclick=function(){ document.querySelectorAll('.acc-ck').forEach(function(c){c.checked=false;}); var a=document.getElementById('ck-all-acc'); if(a) a.checked=false; updateAccBulkBar(); };
 
-  accBulkBar.appendChild(accBulkInfo); accBulkBar.appendChild(bindPageSel); accBulkBar.appendChild(bindBtn);
+  accBulkBar.appendChild(accBulkInfo); accBulkBar.appendChild(switchTypeBtn); accBulkBar.appendChild(bindPageSel); accBulkBar.appendChild(bindBtn);
   accBulkBar.appendChild(bulkLiveBtn); accBulkBar.appendChild(bulkDieBtn); accBulkBar.appendChild(delAccBtn); accBulkBar.appendChild(cancelAccBtn);
   area.appendChild(accBulkBar);
 
@@ -1233,7 +1248,20 @@ function renderAccRows(accs,type) {
 
     var tdCkA=document.createElement('td');
     var ckA=document.createElement('input'); ckA.type='checkbox'; ckA.className='acc-ck'; ckA.dataset.idx=realIdx;
-    ckA.onclick=function(e){ e.stopPropagation(); updateAccBulkBar(); };
+    ckA.onclick=(function(ri){ return function(e) {
+      e.stopPropagation();
+      if (e.shiftKey && window._lastAccCk !== undefined) {
+        var cks = Array.from(document.querySelectorAll('.acc-ck'));
+        var a = cks.findIndex(function(c){ return parseInt(c.dataset.idx)===window._lastAccCk; });
+        var b = cks.findIndex(function(c){ return parseInt(c.dataset.idx)===ri; });
+        if (a >= 0 && b >= 0) {
+          var lo = Math.min(a,b), hi = Math.max(a,b);
+          for (var x=lo; x<=hi; x++) cks[x].checked = true;
+        }
+      }
+      window._lastAccCk = ri;
+      updateAccBulkBar();
+    }; })(realIdx);
     tdCkA.appendChild(ckA); tr.appendChild(tdCkA);
     var tdSttA=document.createElement('td'); tdSttA.style.cssText='color:#8888bb;font-size:11px;text-align:center'; tdSttA.textContent=i+1; tr.appendChild(tdSttA);
     var tdName=document.createElement('td'); tdName.textContent=a.name||'—'; tr.appendChild(tdName);
@@ -1602,6 +1630,21 @@ function exportExcel() {
   a.download = 'social-manager.csv';
   a.click();
   showToast('Da xuat file Excel (CSV)','success');
+}
+
+
+function bulkSwitchAccType() {
+  var cks = document.querySelectorAll('.acc-ck:checked');
+  if (!cks.length) return showToast('Chưa chọn acc nào','error');
+  var changed = 0;
+  cks.forEach(function(ck) {
+    var a = DB.accs[parseInt(ck.dataset.idx)];
+    if (!a) return;
+    a.type = (a.type === 'Acc đăng bài') ? 'Acc tạo page' : 'Acc đăng bài';
+    changed++;
+  });
+  saveDB(); renderContent();
+  showToast('Đã đổi loại ' + changed + ' acc', 'success');
 }
 
 function updateAccBulkBar() {
