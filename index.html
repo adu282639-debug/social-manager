@@ -139,7 +139,8 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   <div class="login-box">
     <div class="login-logo">⬡ Social Manager</div>
     <div class="login-sub">Nhập mật khẩu để truy cập</div>
-    <input type="password" id="login-input" placeholder="Master password" onkeydown="if(event.key==='Enter')doLogin()">
+    <input type="text" style="display:none" name="fakeusername">
+    <input type="password" id="login-input" autocomplete="new-password" placeholder="Master password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" onclick="doLogin()">Đăng nhập</button>
     <div class="login-err" id="login-err">Sai mật khẩu. Thử lại.</div>
   </div>
@@ -167,7 +168,7 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 <!-- MODAL PAGE -->
 <div class="modal-overlay" id="modal-page">
-  <div class="modal">
+  <div class="modal" autocomplete="off">
     <div class="modal-title" id="modal-page-title">Thêm page mới</div>
     <div class="form-grid">
       <div class="form-group"><label>ID Page *</label><input id="fp-id" placeholder="100082341"></div>
@@ -195,7 +196,7 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 <!-- MODAL ADMIN -->
 <div class="modal-overlay" id="modal-admin">
-  <div class="modal">
+  <div class="modal" autocomplete="off">
     <div class="modal-title" id="modal-admin-title">Thêm FB Admin</div>
     <div class="form-group" style="margin-bottom:12px">
       <label>UID Facebook *</label>
@@ -212,10 +213,10 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
             <option value="Acc tạo page">Acc tạo page</option>
           </select>
         </div>
-        <div class="form-group"><label>Mật khẩu</label><input id="fa-pass" placeholder="••••••••"></div>
+        <div class="form-group"><label>Mật khẩu</label><input id="fa-pass" placeholder="••••••••" autocomplete="off"></div>
         <div class="form-group"><label>2FA Seed</label><input id="fa-2fa" placeholder="JBSWY3DPEHPK3PXP"></div>
         <div class="form-group"><label>Email</label><input id="fa-mail" placeholder="ten@gmail.com"></div>
-        <div class="form-group"><label>Mật khẩu mail</label><input id="fa-mailpass" placeholder="••••••••"></div>
+        <div class="form-group"><label>Mật khẩu mail</label><input id="fa-mailpass" placeholder="••••••••" autocomplete="off"></div>
         <div class="form-group" style="grid-column:1/-1"><label>Cookie (dán chuỗi đầy đủ)</label>
           <textarea id="fa-cookie" rows="3" placeholder="datr=xxx; c_user=xxx; xs=xxx; ..." style="font-family:var(--mono);font-size:11px;resize:vertical"></textarea>
         </div>
@@ -250,9 +251,9 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   <div class="modal" style="max-width:360px">
     <div class="modal-title">Đổi mật khẩu</div>
     <div style="display:flex;flex-direction:column;gap:12px">
-      <div class="form-group"><label>Mật khẩu hiện tại</label><input type="password" id="cp-old"></div>
-      <div class="form-group"><label>Mật khẩu mới</label><input type="password" id="cp-new"></div>
-      <div class="form-group"><label>Xác nhận mật khẩu mới</label><input type="password" id="cp-confirm"></div>
+      <div class="form-group"><label>Mật khẩu hiện tại</label><input type="password" id="cp-old" autocomplete="off"></div>
+      <div class="form-group"><label>Mật khẩu mới</label><input type="password" id="cp-new" autocomplete="new-password"></div>
+      <div class="form-group"><label>Xác nhận mật khẩu mới</label><input type="password" id="cp-confirm" autocomplete="new-password"></div>
     </div>
     <div class="form-actions">
       <button class="btn" onclick="closeModal('modal-changepass')">Hủy</button>
@@ -304,10 +305,10 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       <div class="form-group"><label>Loại</label>
         <select id="ba-type"><option value="Acc đăng bài">Acc đăng bài</option><option value="Acc tạo page">Acc tạo page</option></select>
       </div>
-      <div class="form-group"><label>Pass</label><input id="ba-pass" placeholder="••••••••"></div>
+      <div class="form-group"><label>Pass</label><input id="ba-pass" placeholder="••••••••" autocomplete="off"></div>
       <div class="form-group"><label>2FA</label><input id="ba-2fa" placeholder="JBSWY3DP..."></div>
       <div class="form-group"><label>Mail</label><input id="ba-mail" placeholder="ten@gmail.com"></div>
-      <div class="form-group"><label>Mk mail</label><input id="ba-mailpass" placeholder="••••••••"></div>
+      <div class="form-group"><label>Mk mail</label><input id="ba-mailpass" placeholder="••••••••" autocomplete="off"></div>
       <div class="form-group" style="grid-column:1/-1"><label>Cookie</label>
         <textarea id="ba-cookie" rows="3" style="font-family:var(--mono);font-size:11px;resize:vertical" placeholder="datr=xxx; c_user=xxx;..."></textarea>
       </div>
