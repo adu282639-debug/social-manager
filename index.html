@@ -213,6 +213,13 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
             <option value="Acc tạo page">Acc tạo page</option>
           </select>
         </div>
+        <div class="form-group"><label>Trạng thái</label>
+          <select id="fa-status">
+            <option value="Live">Live</option>
+            <option value="Die">Die</option>
+            <option value="Checkpoint">Checkpoint</option>
+          </select>
+        </div>
         <div class="form-group"><label>Mật khẩu</label><input id="fa-pass" placeholder="••••••••" autocomplete="off"></div>
         <div class="form-group"><label>2FA Seed</label><input id="fa-2fa" placeholder="JBSWY3DPEHPK3PXP"></div>
         <div class="form-group"><label>Email</label><input id="fa-mail" placeholder="ten@gmail.com"></div>
@@ -1041,6 +1048,7 @@ function openEditAdmin(pageIdx,adminIdx) {
   document.getElementById('fa-type').value=a.type||'Acc đăng bài';
   document.getElementById('fa-pass').value=a.pass||'';
   document.getElementById('fa-2fa').value=a['2fa']||'';
+  if(document.getElementById('fa-status')) document.getElementById('fa-status').value=a.status||'Live';
   document.getElementById('fa-mail').value=a.mail||'';
   document.getElementById('fa-mailpass').value=a.mailpass||'';
   document.getElementById('fa-cookie').value=a.cookie||'';
@@ -1092,7 +1100,7 @@ function saveAdmin() {
   var targetIdx=bindVal!==''?parseInt(bindVal):pageIdx;
   var page=DB.pages[sheet][targetIdx];
   if(!page.admins) page.admins=[];
-  var acc={uid:uid,name:document.getElementById('fa-name').value.trim(),link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,pass:document.getElementById('fa-pass').value,
+  var acc={uid:uid,name:document.getElementById('fa-name').value.trim(),link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,status:document.getElementById('fa-status')?document.getElementById('fa-status').value:'Live',pass:document.getElementById('fa-pass').value,
     '2fa':document.getElementById('fa-2fa').value.trim(),cookie:document.getElementById('fa-cookie').value,mail:document.getElementById('fa-mail').value.trim(),mailpass:document.getElementById('fa-mailpass').value};
   if(editAccIdx!==null){
     DB.pages[sheet][pageIdx].admins[editAccIdx]=acc; syncAccGlobal(acc); showToast('Đã cập nhật admin','success');
@@ -1145,12 +1153,50 @@ function renderAccView(area) {
   tb.appendChild(impBtn);
   area.appendChild(tb);
 
+  var accBulkBar=document.createElement('div'); accBulkBar.id='acc-bulk-bar';
+  accBulkBar.style.cssText='display:none;padding:8px 20px;background:var(--blue-bg);border-bottom:1px solid var(--blue);align-items:center;gap:10px;flex-wrap:wrap';
+  var accBulkInfo=document.createElement('span'); accBulkInfo.id='acc-bulk-info'; accBulkInfo.style.cssText='font-size:12px;color:var(--blue-text)';
+  
+  var bindPageSel=document.createElement('select'); bindPageSel.id='acc-bind-page-sel';
+  bindPageSel.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:5px 8px;color:var(--text);font-size:11px;outline:none';
+  var optDef=document.createElement('option'); optDef.value=''; optDef.textContent='-- Gắn vào page --'; bindPageSel.appendChild(optDef);
+  Object.entries(DB.pages).forEach(function(entry){
+    entry[1].forEach(function(p,pi){
+      var opt=document.createElement('option'); opt.value=entry[0]+'|'+pi;
+      opt.textContent='['+entry[0]+'] '+(p.name||p.id);
+      bindPageSel.appendChild(opt);
+    });
+  });
+  
+  var bindBtn=document.createElement('button'); bindBtn.className='btn btn-sm'; bindBtn.style.cssText='border-color:var(--purple);color:var(--purple-text)';
+  bindBtn.textContent='Gắn page đã chọn'; bindBtn.onclick=bulkBindAccToPage;
+
+  var bulkLiveBtn=document.createElement('button'); bulkLiveBtn.className='btn btn-sm'; bulkLiveBtn.style.cssText='border-color:var(--green);color:var(--green-text)';
+  bulkLiveBtn.textContent='→ Live'; bulkLiveBtn.onclick=function(){ bulkSetAccStatus('Live'); };
+
+  var bulkDieBtn=document.createElement('button'); bulkDieBtn.className='btn btn-sm'; bulkDieBtn.style.cssText='border-color:var(--red);color:var(--red-text)';
+  bulkDieBtn.textContent='→ Die'; bulkDieBtn.onclick=function(){ bulkSetAccStatus('Die'); };
+
+  var delAccBtn=document.createElement('button'); delAccBtn.className='btn btn-sm'; delAccBtn.style.cssText='border-color:var(--red);color:var(--red-text);background:var(--red-bg)';
+  delAccBtn.textContent='Xóa đã chọn'; delAccBtn.onclick=deleteSelectedAccs;
+
+  var cancelAccBtn=document.createElement('button'); cancelAccBtn.className='btn btn-sm'; cancelAccBtn.textContent='Bỏ chọn';
+  cancelAccBtn.onclick=function(){ document.querySelectorAll('.acc-ck').forEach(function(c){c.checked=false;}); var a=document.getElementById('ck-all-acc'); if(a) a.checked=false; updateAccBulkBar(); };
+
+  accBulkBar.appendChild(accBulkInfo); accBulkBar.appendChild(bindPageSel); accBulkBar.appendChild(bindBtn);
+  accBulkBar.appendChild(bulkLiveBtn); accBulkBar.appendChild(bulkDieBtn); accBulkBar.appendChild(delAccBtn); accBulkBar.appendChild(cancelAccBtn);
+  area.appendChild(accBulkBar);
+
   var tw=document.createElement('div'); tw.className='table-wrap';
   var tbl=document.createElement('table');
   var thead=document.createElement('thead'); var htr=document.createElement('tr');
-  ['STT','Tên FB','UID','Link FB','Pass','2FA','Cookie','Mail','Mk mail','Gắn page','Thao tác'].forEach(function(h,i){
+  var thCkA=document.createElement('th'); thCkA.style.width='32px';
+  var ckAllA=document.createElement('input'); ckAllA.type='checkbox'; ckAllA.id='ck-all-acc';
+  ckAllA.onchange=function(){ document.querySelectorAll('.acc-ck').forEach(function(c){ c.checked=ckAllA.checked; }); updateAccBulkBar(); };
+  thCkA.appendChild(ckAllA); htr.appendChild(thCkA);
+  ['STT','Tên FB','UID','Link FB','TT','Pass','2FA','Cookie','Mail','Mk mail','Gắn page','Thao tác'].forEach(function(h,i){
     var th=document.createElement('th'); th.textContent=h;
-    var ws=[36,100,90,115,70,60,110,125,70,0,62];
+    var ws=[36,100,90,115,52,70,60,110,125,70,0,62];
     if(ws[i]) th.style.width=ws[i]+'px';
     htr.appendChild(th);
   });
@@ -1185,12 +1231,25 @@ function renderAccRows(accs,type) {
       tr.appendChild(td); return td;
     }
 
+    var tdCkA=document.createElement('td');
+    var ckA=document.createElement('input'); ckA.type='checkbox'; ckA.className='acc-ck'; ckA.dataset.idx=realIdx;
+    ckA.onclick=function(e){ e.stopPropagation(); updateAccBulkBar(); };
+    tdCkA.appendChild(ckA); tr.appendChild(tdCkA);
     var tdSttA=document.createElement('td'); tdSttA.style.cssText='color:#8888bb;font-size:11px;text-align:center'; tdSttA.textContent=i+1; tr.appendChild(tdSttA);
     var tdName=document.createElement('td'); tdName.textContent=a.name||'—'; tr.appendChild(tdName);
     var td0=document.createElement('td'); td0.style.cssText='font-family:var(--mono);font-weight:500'; td0.textContent=a.uid; tr.appendChild(td0);
     var td1=document.createElement('td'); td1.className='clip';
     if(a.link){ var lnk=document.createElement('span'); lnk.style.cssText='color:var(--blue-text);text-decoration:underline;cursor:pointer'; lnk.textContent=a.link; lnk.onclick=(function(url){ return function(){ openLink(url); }; })(a.link); td1.appendChild(lnk); } else td1.textContent='—';
     tr.appendChild(td1);
+    // Status badge
+    var tdSt=document.createElement('td');
+    var stBadge=document.createElement('span');
+    var stVal=a.status||'Live';
+    stBadge.className='badge '+(stVal==='Live'?'b-green':stVal==='Die'?'b-red':'b-amber');
+    stBadge.style.cursor='pointer'; stBadge.title='Bấm để đổi';
+    stBadge.textContent=stVal;
+    stBadge.onclick=(function(ri){ return function(){ cycleAccStatus(ri); }; })(realIdx);
+    tdSt.appendChild(stBadge); tr.appendChild(tdSt);
     addTd(a.pass?'••••••••':'—',false,'color:var(--text3)');
     addTd(a['2fa']?'••••':'—',false,'color:var(--text3)');
 
@@ -1244,7 +1303,7 @@ function saveAccDirect() {
   var uid=document.getElementById('fa-uid').value.trim();
   if(!uid) return showToast('UID là bắt buộc','error');
   if(DB.accs.find(function(a){ return a.uid===uid; })) return showToast('UID này đã tồn tại','error');
-  var acc={uid:uid,name:document.getElementById('fa-name').value.trim(),link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,pass:document.getElementById('fa-pass').value,
+  var acc={uid:uid,name:document.getElementById('fa-name').value.trim(),link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,status:document.getElementById('fa-status')?document.getElementById('fa-status').value:'Live',pass:document.getElementById('fa-pass').value,
     '2fa':document.getElementById('fa-2fa').value.trim(),cookie:document.getElementById('fa-cookie').value,mail:document.getElementById('fa-mail').value.trim(),mailpass:document.getElementById('fa-mailpass').value};
   DB.accs.push(acc);
   var bv=document.getElementById('fa-page-bind').value;
@@ -1276,9 +1335,16 @@ function openEditAccGlobal(idx) {
 function saveAccGlobalEdit(idx) {
   var uid=document.getElementById('fa-uid').value.trim();
   if(!uid) return showToast('UID là bắt buộc','error');
-  DB.accs[idx]=Object.assign({},DB.accs[idx],{uid:uid,link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,
-    pass:document.getElementById('fa-pass').value,'2fa':document.getElementById('fa-2fa').value.trim(),cookie:document.getElementById('fa-cookie').value,
-    mail:document.getElementById('fa-mail').value.trim(),mailpass:document.getElementById('fa-mailpass').value});
+  DB.accs[idx]=Object.assign({},DB.accs[idx],{uid:uid,
+    name:document.getElementById('fa-name').value.trim(),
+    link:document.getElementById('fa-link').value.trim(),
+    type:document.getElementById('fa-type').value,
+    pass:document.getElementById('fa-pass').value,
+    '2fa':document.getElementById('fa-2fa').value.trim(),
+    cookie:document.getElementById('fa-cookie').value,
+    mail:document.getElementById('fa-mail').value.trim(),
+    mailpass:document.getElementById('fa-mailpass').value
+  });
   saveDB(); closeModal('modal-admin'); renderContent(); showToast('Đã cập nhật','success');
   document.getElementById('save-admin-btn').onclick=saveAdmin;
 }
@@ -1526,6 +1592,76 @@ function exportExcel() {
   a.click();
   showToast('Da xuat file Excel (CSV)','success');
 }
+
+function updateAccBulkBar() {
+  var bar = document.getElementById('acc-bulk-bar');
+  var cks = document.querySelectorAll('.acc-ck:checked');
+  var info = document.getElementById('acc-bulk-info');
+  if (!bar) return;
+  if (cks.length > 0) {
+    bar.style.display = 'flex';
+    info.textContent = 'Đã chọn ' + cks.length + ' acc';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function bulkSetAccStatus(status) {
+  var cks = document.querySelectorAll('.acc-ck:checked');
+  if (!cks.length) return;
+  cks.forEach(function(ck) {
+    var a = DB.accs[parseInt(ck.dataset.idx)];
+    if (a) a.status = status;
+  });
+  saveDB(); renderContent();
+  showToast('Đã đổi ' + cks.length + ' acc sang ' + status, 'success');
+}
+
+function bulkBindAccToPage() {
+  var cks = document.querySelectorAll('.acc-ck:checked');
+  if (!cks.length) return showToast('Chưa chọn acc nào', 'error');
+  var sel = document.getElementById('acc-bind-page-sel');
+  if (!sel || !sel.value) return showToast('Chưa chọn page', 'error');
+  var parts = sel.value.split('|');
+  var sheet = parts[0]; var pi = parseInt(parts[1]);
+  var page = DB.pages[sheet] && DB.pages[sheet][pi];
+  if (!page) return showToast('Không tìm thấy page', 'error');
+  if (!page.admins) page.admins = [];
+  var added = 0;
+  cks.forEach(function(ck) {
+    var a = DB.accs[parseInt(ck.dataset.idx)];
+    if (!a) return;
+    if (!page.admins.find(function(x){ return x.uid === a.uid; })) {
+      page.admins.push(Object.assign({}, a));
+      added++;
+    }
+  });
+  saveDB(); renderContent();
+  showToast('Đã gắn ' + added + ' acc vào page ' + (page.name||page.id), 'success');
+}
+
+function deleteSelectedAccs() {
+  var cks = document.querySelectorAll('.acc-ck:checked');
+  if (!cks.length) return;
+  if (!confirm('Xóa ' + cks.length + ' acc đã chọn?')) return;
+  var idxs = [];
+  cks.forEach(function(ck){ idxs.push(parseInt(ck.dataset.idx)); });
+  idxs.sort(function(a,b){ return b-a; });
+  idxs.forEach(function(i){ DB.accs.splice(i,1); });
+  saveDB(); renderContent();
+  showToast('Đã xóa ' + idxs.length + ' acc', 'info');
+}
+
+function cycleAccStatus(idx) {
+  var a = DB.accs[idx];
+  if (!a) return;
+  var cycle = ['Live','Die','Checkpoint'];
+  var cur = cycle.indexOf(a.status||'Live');
+  a.status = cycle[(cur+1) % cycle.length];
+  saveDB(); renderContent();
+  showToast('Trạng thái: ' + a.status, 'info');
+}
+
 function cycleStatus(idx) {
   var page=(DB.pages[DB.activeSheet]||[])[idx];
   if(!page) return;
