@@ -154,6 +154,7 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     </div>
     <div class="topbar-actions">
       <button class="top-btn" onclick="exportData()">↓ Export JSON</button>
+      <button class="top-btn" onclick="exportExcel()" style="border-color:var(--green);color:var(--green-text)">↓ Export Excel</button>
       <button class="top-btn" onclick="document.getElementById('import-file').click()">↑ Import JSON</button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
       <button class="top-btn" onclick="openModal('modal-changepass')">🔒 Đổi mật khẩu</button>
@@ -275,6 +276,35 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   </div>
 </div>
 
+<!-- MODAL BULK ADD ADMIN -->
+<div class="modal-overlay" id="modal-bulk-admin">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">Thêm admin cho các page đã chọn</div>
+    <div id="bulk-admin-selected" style="font-size:12px;color:var(--purple-text);margin-bottom:12px;padding:8px 10px;background:var(--purple-bg);border-radius:var(--radius)"></div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>UID Facebook *</label>
+      <input id="ba-uid" placeholder="382910472">
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Tên FB</label><input id="ba-name" placeholder="Nguyễn Văn A"></div>
+      <div class="form-group"><label>Loại</label>
+        <select id="ba-type"><option value="Acc đăng bài">Acc đăng bài</option><option value="Acc tạo page">Acc tạo page</option></select>
+      </div>
+      <div class="form-group"><label>Pass</label><input id="ba-pass" placeholder="••••••••"></div>
+      <div class="form-group"><label>2FA</label><input id="ba-2fa" placeholder="JBSWY3DP..."></div>
+      <div class="form-group"><label>Mail</label><input id="ba-mail" placeholder="ten@gmail.com"></div>
+      <div class="form-group"><label>Mk mail</label><input id="ba-mailpass" placeholder="••••••••"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Cookie</label>
+        <textarea id="ba-cookie" rows="3" style="font-family:var(--mono);font-size:11px;resize:vertical" placeholder="datr=xxx; c_user=xxx;..."></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('modal-bulk-admin')">Hủy</button>
+      <button class="btn btn-primary" onclick="saveBulkAdmin()">Thêm vào tất cả page đã chọn</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL BULK IMPORT -->
 <div class="modal-overlay" id="modal-bulk">
   <div class="modal modal-wide">
@@ -323,11 +353,21 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const firebaseConfig = {
+
+
+<script>
+var DB = {
+  password: 'admin123',
+  sheets: ['Tháng 5/2026'],
+  activeSheet: 'Tháng 5/2026',
+  activeView: 'sheet',
+  pages: {},
+  accs: []
+};
+
+// Firebase config
+var _fbConfig = {
   apiKey: "AIzaSyCuaZA2JfVjolEqhrH9PoOmcu3aE1-Vr_M",
   authDomain: "social-manager-b386f.firebaseapp.com",
   projectId: "social-manager-b386f",
@@ -336,42 +376,8 @@ const firebaseConfig = {
   appId: "1:1049526637047:web:9cf3708d45ff5a8a01def2"
 };
 
-const fireApp = initializeApp(firebaseConfig);
-const db = getFirestore(fireApp);
-
-window._fbSaveTimeout = null;
-
-window.saveToFirebase = async function() {
-  try {
-    await setDoc(doc(db, 'data', 'main'), {
-      payload: JSON.stringify(DB),
-      updatedAt: new Date().toISOString()
-    });
-    showSyncStatus('saved');
-  } catch(e) {
-    console.error('Firebase save error:', e);
-    showSyncStatus('error');
-  }
-};
-
-window.loadFromFirebase = async function() {
-  try {
-    showSyncStatus('loading');
-    const snap = await getDoc(doc(db, 'data', 'main'));
-    if (snap.exists()) {
-      DB = JSON.parse(snap.data().payload);
-      localStorage.setItem('smdb_v2', JSON.stringify(DB));
-      showSyncStatus('loaded');
-      return true;
-    }
-    showSyncStatus('empty');
-    return false;
-  } catch(e) {
-    console.error('Firebase load error:', e);
-    showSyncStatus('error');
-    return false;
-  }
-};
+var _fbDb = null;
+var _fbSaveTimeout = null;
 
 function showSyncStatus(status) {
   var el = document.getElementById('sync-status');
@@ -380,49 +386,76 @@ function showSyncStatus(status) {
     saving: {t:'Đang lưu...', c:'var(--amber-text)'},
     saved: {t:'✓ Đã lưu cloud', c:'var(--green-text)'},
     loading: {t:'Đang tải...', c:'var(--blue-text)'},
-    loaded: {t:'✓ Đã tải từ cloud', c:'var(--green-text)'},
+    loaded: {t:'✓ Đã tải cloud', c:'var(--green-text)'},
     empty: {t:'Cloud trống', c:'var(--text3)'},
-    error: {t:'⚠ Lỗi kết nối', c:'var(--red-text)'}
+    error: {t:'⚠ Lỗi kết nối', c:'var(--red-text)'},
+    offline: {t:'Offline', c:'var(--text3)'}
   };
-  var s = map[status] || {t:status,c:'var(--text2)'};
+  var s = map[status] || {t: status, c: 'var(--text2)'};
   el.textContent = s.t; el.style.color = s.c;
 }
 
-// Debounced save - auto save 1.5s after any change
-window.scheduleSave = function() {
+function scheduleSave() {
   showSyncStatus('saving');
-  clearTimeout(window._fbSaveTimeout);
-  window._fbSaveTimeout = setTimeout(function() {
-    window.saveToFirebase();
-  }, 1500);
-};
+  clearTimeout(_fbSaveTimeout);
+  _fbSaveTimeout = setTimeout(function() { fbSave(); }, 1500);
+}
 
-// Override saveDB to also sync firebase
-var _origSaveDB = window.saveDB;
+function fbSave() {
+  if (!_fbDb) return;
+  try {
+    var setDoc = window._fbSetDoc;
+    var doc = window._fbDoc;
+    if (!setDoc || !doc) return;
+    setDoc(doc(_fbDb, 'data', 'main'), {
+      payload: JSON.stringify(DB),
+      updatedAt: new Date().toISOString()
+    }).then(function() {
+      showSyncStatus('saved');
+    }).catch(function(e) {
+      showSyncStatus('error');
+    });
+  } catch(e) { showSyncStatus('error'); }
+}
 
-window.saveDB = function() {
-  localStorage.setItem('smdb_v2', JSON.stringify(DB));
-  window.scheduleSave();
-};
+function fbLoad() {
+  if (!_fbDb) return;
+  try {
+    var getDoc = window._fbGetDoc;
+    var doc = window._fbDoc;
+    if (!getDoc || !doc) return;
+    showSyncStatus('loading');
+    getDoc(doc(_fbDb, 'data', 'main')).then(function(snap) {
+      if (snap.exists()) {
+        DB = JSON.parse(snap.data().payload);
+        localStorage.setItem('smdb_v2', JSON.stringify(DB));
+        showSyncStatus('loaded');
+        if (sessionStorage.getItem('sm_logged') === '1') renderAll();
+      } else {
+        showSyncStatus('empty');
+      }
+    }).catch(function() { showSyncStatus('error'); });
+  } catch(e) { showSyncStatus('error'); }
+}
 
-// Init: load from firebase first, fallback to localStorage
-(async function() {
-  window.loadDB(); // load localStorage first for instant render
-  // Auto-login check
-  if (sessionStorage.getItem('sm_logged') === '1') {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    window.renderAll();
-  }
-  // Then load from Firebase and refresh
-  var loaded = await window.loadFromFirebase();
-  if (loaded && sessionStorage.getItem('sm_logged') === '1') {
-    window.renderAll();
-  }
-})();
+// Init Firebase via dynamic import
+Promise.all([
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js'),
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js')
+]).then(function(modules) {
+  var firebaseApp = modules[0];
+  var firestore = modules[1];
+  var app = firebaseApp.initializeApp(_fbConfig);
+  _fbDb = firestore.getFirestore(app);
+  window._fbSetDoc = firestore.setDoc;
+  window._fbGetDoc = firestore.getDoc;
+  window._fbDoc = firestore.doc;
+  fbLoad();
+}).catch(function() {
+  showSyncStatus('offline');
+});
 
-</script>
-<script>
+
 var DB = {
   password: 'admin123',
   sheets: ['Tháng 5/2026'],
@@ -643,8 +676,19 @@ function renderSheetView(area) {
   delSelBtn.textContent='Xóa đã chọn'; delSelBtn.onclick=deleteSelected;
   var delDieBtn=document.createElement('button'); delDieBtn.className='btn btn-sm'; delDieBtn.style.cssText='border-color:var(--red);color:var(--red-text)';
   delDieBtn.textContent='Xóa tất cả Die'; delDieBtn.onclick=deleteAllDie;
+
+  var openLinksBtn=document.createElement('button'); openLinksBtn.className='btn btn-sm'; openLinksBtn.style.cssText='border-color:var(--blue);color:var(--blue-text)';
+  openLinksBtn.textContent='🔗 Mở link đã chọn'; openLinksBtn.onclick=openSelectedLinks;
+
+  var bulkStatusSel=document.createElement('select'); bulkStatusSel.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;color:var(--text);font-size:11px;outline:none';
+  ['-- Đổi trạng thái --','Đang đăng','Đăng xong','Die'].forEach(function(s){ var o=document.createElement('option'); o.textContent=s; o.value=s; bulkStatusSel.appendChild(o); });
+  bulkStatusSel.onchange=function(){ if(this.value&&this.value!=='-- Đổi trạng thái --'){ bulkChangeStatus(this.value); this.value='-- Đổi trạng thái --'; } };
+
+  var bulkAdminBtn=document.createElement('button'); bulkAdminBtn.className='btn btn-sm'; bulkAdminBtn.style.cssText='border-color:var(--purple);color:var(--purple-text)';
+  bulkAdminBtn.textContent='+ Thêm admin chung'; bulkAdminBtn.onclick=openBulkAddAdmin;
+
   var cancelBtn=document.createElement('button'); cancelBtn.className='btn btn-sm'; cancelBtn.textContent='Bỏ chọn'; cancelBtn.onclick=clearSelection;
-  bulkBar.appendChild(bulkInfo); bulkBar.appendChild(delSelBtn); bulkBar.appendChild(delDieBtn); bulkBar.appendChild(cancelBtn);
+  bulkBar.appendChild(bulkInfo); bulkBar.appendChild(openLinksBtn); bulkBar.appendChild(bulkStatusSel); bulkBar.appendChild(bulkAdminBtn); bulkBar.appendChild(delSelBtn); bulkBar.appendChild(delDieBtn); bulkBar.appendChild(cancelBtn);
   area.appendChild(bulkBar);
 
   // Table
@@ -656,9 +700,9 @@ function renderSheetView(area) {
   var ckAll=document.createElement('input'); ckAll.type='checkbox'; ckAll.id='ck-all';
   ckAll.onchange=function(){ document.querySelectorAll('.row-ck').forEach(function(c){ c.checked=ckAll.checked; }); updateBulkBar(); };
   thCk.appendChild(ckAll); htr.appendChild(thCk);
-  ['','ID Page','Tên Page','Link Page','Instagram','Trạng thái','Sản phẩm','Bắt đầu','Kết thúc','Thao tác'].forEach(function(h,i){
+  ['','STT','ID Page','Tên Page','Link Page','Instagram','Trạng thái','Sản phẩm','Bắt đầu','Kết thúc','Thao tác'].forEach(function(h,i){
     var th = document.createElement('th'); th.textContent=h;
-    var ws = [28,90,110,120,100,85,100,80,90,62];
+    var ws = [28,36,90,110,115,95,85,95,78,88,62];
     if(ws[i]) th.style.width=ws[i]+'px';
     htr.appendChild(th);
   });
@@ -678,7 +722,7 @@ function renderPageRows(filtered, allPages) {
     etd.innerHTML = '<div class="empty-state"><div>📋</div>Chưa có page nào</div>';
     etr.appendChild(etd); tbody.appendChild(etr); return;
   }
-  filtered.forEach(function(p) {
+  filtered.forEach(function(p, fi) {
     var realIdx = allPages.indexOf(p);
     var dl = deadlineStatus(p.end);
     var dlCls = dl==='warn'?'date-warn':dl==='danger'?'date-danger':'date-ok';
@@ -692,6 +736,9 @@ function renderPageRows(filtered, allPages) {
     var ck=document.createElement('input'); ck.type='checkbox'; ck.className='row-ck'; ck.dataset.idx=realIdx;
     ck.onclick=function(e){ e.stopPropagation(); updateBulkBar(); };
     tdCk.appendChild(ck); tr.appendChild(tdCk);
+
+    // STT cell
+    var tdStt=document.createElement('td'); tdStt.style.cssText='color:var(--text3);font-size:11px;text-align:center'; tdStt.textContent=fi+1; tr.appendChild(tdStt);
 
     var cells = [
       function(){
@@ -1020,9 +1067,9 @@ function renderAccView(area) {
   var tw=document.createElement('div'); tw.className='table-wrap';
   var tbl=document.createElement('table');
   var thead=document.createElement('thead'); var htr=document.createElement('tr');
-  ['Tên FB','UID','Link FB','Pass','2FA','Cookie','Mail','Mk mail','Gắn page','Thao tác'].forEach(function(h,i){
+  ['STT','Tên FB','UID','Link FB','Pass','2FA','Cookie','Mail','Mk mail','Gắn page','Thao tác'].forEach(function(h,i){
     var th=document.createElement('th'); th.textContent=h;
-    var ws=[100,90,120,70,60,110,130,70,0,62];
+    var ws=[36,100,90,115,70,60,110,125,70,0,62];
     if(ws[i]) th.style.width=ws[i]+'px';
     htr.appendChild(th);
   });
@@ -1057,6 +1104,7 @@ function renderAccRows(accs,type) {
       tr.appendChild(td); return td;
     }
 
+    var tdSttA=document.createElement('td'); tdSttA.style.cssText='color:var(--text3);font-size:11px;text-align:center'; tdSttA.textContent=i+1; tr.appendChild(tdSttA);
     var tdName=document.createElement('td'); tdName.textContent=a.name||'—'; tr.appendChild(tdName);
     var td0=document.createElement('td'); td0.style.cssText='font-family:var(--mono);font-weight:500'; td0.textContent=a.uid; tr.appendChild(td0);
     var td1=document.createElement('td'); td1.className='clip';
@@ -1288,6 +1336,121 @@ document.querySelectorAll('.modal-overlay').forEach(function(el){
 });
 
 
+
+function openSelectedLinks() {
+  var cks = document.querySelectorAll('.row-ck:checked');
+  if (!cks.length) return showToast('Chưa chọn page nào','error');
+  var pages = DB.pages[DB.activeSheet] || [];
+  var opened = 0;
+  cks.forEach(function(ck) {
+    var p = pages[parseInt(ck.dataset.idx)];
+    if (p && p.link) { openLink(p.link); opened++; }
+  });
+  showToast('Đã mở ' + opened + ' link','success');
+}
+
+function bulkChangeStatus(status) {
+  var cks = document.querySelectorAll('.row-ck:checked');
+  if (!cks.length) return;
+  var pages = DB.pages[DB.activeSheet] || [];
+  cks.forEach(function(ck) {
+    var p = pages[parseInt(ck.dataset.idx)];
+    if (p) p.status = status;
+  });
+  saveDB(); renderContent();
+  showToast('Đã đổi trạng thái ' + cks.length + ' page','success');
+}
+
+function openBulkAddAdmin() {
+  var cks = document.querySelectorAll('.row-ck:checked');
+  if (!cks.length) return showToast('Chưa chọn page nào','error');
+  var pages = DB.pages[DB.activeSheet] || [];
+  var names = [];
+  cks.forEach(function(ck) {
+    var p = pages[parseInt(ck.dataset.idx)];
+    if (p) names.push(p.name || p.id);
+  });
+  document.getElementById('bulk-admin-selected').textContent = 'Sẽ thêm vào ' + cks.length + ' page: ' + names.slice(0,5).join(', ') + (names.length>5?'...':'');
+  ['ba-uid','ba-name','ba-pass','ba-2fa','ba-mail','ba-mailpass','ba-cookie'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('ba-type').value = 'Acc đăng bài';
+  openModal('modal-bulk-admin');
+}
+
+function saveBulkAdmin() {
+  var uid = document.getElementById('ba-uid').value.trim();
+  if (!uid) return showToast('UID là bắt buộc','error');
+  var acc = {
+    uid: uid,
+    name: document.getElementById('ba-name').value.trim(),
+    link: 'facebook.com/profile.php?id=' + uid,
+    type: document.getElementById('ba-type').value,
+    pass: document.getElementById('ba-pass').value,
+    '2fa': document.getElementById('ba-2fa').value.trim(),
+    cookie: document.getElementById('ba-cookie').value,
+    mail: document.getElementById('ba-mail').value.trim(),
+    mailpass: document.getElementById('ba-mailpass').value
+  };
+  var cks = document.querySelectorAll('.row-ck:checked');
+  var pages = DB.pages[DB.activeSheet] || [];
+  var added = 0;
+  cks.forEach(function(ck) {
+    var p = pages[parseInt(ck.dataset.idx)];
+    if (!p) return;
+    if (!p.admins) p.admins = [];
+    if (!p.admins.find(function(a){ return a.uid === uid; })) {
+      p.admins.push(Object.assign({}, acc));
+      added++;
+    }
+  });
+  syncAccGlobal(acc);
+  saveDB(); closeModal('modal-bulk-admin'); renderContent();
+  showToast('Đã thêm admin vào ' + added + ' page','success');
+}
+
+function exportExcel() {
+  var sheet = DB.activeSheet;
+  var pages = DB.pages[sheet] || [];
+
+  // Build CSV with BOM for Excel Vietnamese support
+  var BOM = '﻿';
+  var rows = [['STT','ID Page','Tên Page','Link Page','Trạng thái','Sản phẩm','Bắt đầu','Kết thúc','Số Admin','UID Admin','Tên Admin']];
+
+  pages.forEach(function(p, i) {
+    var adminUIDs = (p.admins||[]).map(function(a){ return a.uid; }).join(' | ');
+    var adminNames = (p.admins||[]).map(function(a){ return a.name||''; }).join(' | ');
+    rows.push([
+      i+1,
+      p.id||'',
+      p.name||'',
+      p.link||'',
+      p.status||'',
+      p.product||'',
+      p.start ? p.start.split('-').reverse().join('/') : '',
+      p.end ? p.end.split('-').reverse().join('/') : '',
+      (p.admins||[]).length,
+      adminUIDs,
+      adminNames
+    ]);
+  });
+
+  var csv = BOM + rows.map(function(r){
+    return r.map(function(c){
+      var s = String(c||'');
+      if (s.includes(',') || s.includes('"') || s.includes('
+')) s = '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }).join(',');
+  }).join('
+');
+
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'social-manager-' + sheet + '.csv';
+  a.click();
+  showToast('Đã xuất Excel (CSV)','success');
+}
+
 function cycleStatus(idx) {
   var page=(DB.pages[DB.activeSheet]||[])[idx];
   if(!page) return;
@@ -1339,6 +1502,7 @@ if (typeof DB !== 'undefined' && sessionStorage.getItem('sm_logged') === '1') {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
 }
+
 </script>
 </body>
 </html>
