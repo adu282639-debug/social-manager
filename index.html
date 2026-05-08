@@ -1488,18 +1488,29 @@ function openSelectedLinks() {
   var cks = document.querySelectorAll('.row-ck:checked');
   if (!cks.length) return showToast('Chưa chọn page nào','error');
   var pages = DB.pages[DB.activeSheet] || [];
-  var opened = 0;
+  var urls = [];
   cks.forEach(function(ck) {
     var p = pages[parseInt(ck.dataset.idx)];
     if (p && p.link) {
       var url = p.link;
       if (url.indexOf('http') !== 0) url = 'https://' + url;
-      window.open(url, '_blank');
-      opened++;
+      urls.push(url);
     }
   });
-  if (opened === 0) showToast('Các page đã chọn chưa có link','error');
-  else showToast('Đã mở ' + opened + ' tab','success');
+  if (!urls.length) return showToast('Các page đã chọn chưa có link','error');
+  // Mở từng link với delay nhỏ để tránh bị chặn popup
+  urls.forEach(function(url, i) {
+    setTimeout(function() {
+      var a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, i * 150);
+  });
+  showToast('Đang mở ' + urls.length + ' tab...','success');
 }
 
 function bulkChangeStatus(status) {
