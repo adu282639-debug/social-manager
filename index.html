@@ -1410,47 +1410,35 @@ function saveBulkAdmin() {
 function exportExcel() {
   var sheet = DB.activeSheet;
   var pages = DB.pages[sheet] || [];
-
-  // Build CSV with BOM for Excel Vietnamese support
-  var BOM = '﻿';
-  var rows = [['STT','ID Page','Tên Page','Link Page','Trạng thái','Sản phẩm','Bắt đầu','Kết thúc','Số Admin','UID Admin','Tên Admin']];
-
+  var BOM = '\uFEFF';
+  var header = ['STT','ID Page','Ten Page','Link Page','Trang thai','San pham','Bat dau','Ket thuc','So Admin','UID Admin','Ten Admin'];
+  var lines = [header.join(',')];
   pages.forEach(function(p, i) {
     var adminUIDs = (p.admins||[]).map(function(a){ return a.uid; }).join(' | ');
     var adminNames = (p.admins||[]).map(function(a){ return a.name||''; }).join(' | ');
-    rows.push([
+    var row = [
       i+1,
       p.id||'',
-      p.name||'',
-      p.link||'',
+      (p.name||'').replace(/,/g,' '),
+      (p.link||'').replace(/,/g,' '),
       p.status||'',
-      p.product||'',
+      (p.product||'').replace(/,/g,' '),
       p.start ? p.start.split('-').reverse().join('/') : '',
       p.end ? p.end.split('-').reverse().join('/') : '',
       (p.admins||[]).length,
       adminUIDs,
       adminNames
-    ]);
+    ];
+    lines.push(row.join(','));
   });
-
-  var csv = BOM + rows.map(function(r){
-    return r.map(function(c){
-      var s = String(c||'');
-      if (s.includes(',') || s.includes('"') || s.includes('
-')) s = '"' + s.replace(/"/g,'""') + '"';
-      return s;
-    }).join(',');
-  }).join('
-');
-
+  var csv = BOM + lines.join('\r\n');
   var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'social-manager-' + sheet + '.csv';
+  a.download = 'social-manager.csv';
   a.click();
-  showToast('Đã xuất Excel (CSV)','success');
+  showToast('Da xuat file Excel (CSV)','success');
 }
-
 function cycleStatus(idx) {
   var page=(DB.pages[DB.activeSheet]||[])[idx];
   if(!page) return;
