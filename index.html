@@ -202,6 +202,7 @@ td.clip{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     <div id="uid-found-banner" style="display:none;background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--amber-text)"></div>
     <div id="admin-form-fields">
       <div class="form-grid">
+        <div class="form-group"><label>Tên FB</label><input id="fa-name" placeholder="Nguyễn Văn A"></div>
         <div class="form-group"><label>Link Facebook</label><input id="fa-link" placeholder="fb.com/ten.nguoi"></div>
         <div class="form-group"><label>Loại tài khoản</label>
           <select id="fa-type">
@@ -486,6 +487,11 @@ function changePassword() {
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
+window.openLink = function(url) {
+  if (!url) return;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
 window.showToast = function showToast(msg, type) {
   var t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast show ' + (type||'info');
@@ -696,12 +702,12 @@ function renderPageRows(filtered, allPages) {
       },
       function(){
         var td=document.createElement('td'); td.className='clip';
-        if(p.link){ var a=document.createElement('a'); a.href='https://'+p.link; a.target='_blank'; a.style.cssText='color:var(--blue-text);text-decoration:none'; a.textContent=p.link; a.onclick=function(e){e.stopPropagation();}; td.appendChild(a); } else td.textContent='—';
+        if(p.link){ var a=document.createElement('span'); a.style.cssText='color:var(--blue-text);text-decoration:underline;cursor:pointer'; a.textContent=p.link; a.onclick=function(e){e.stopPropagation();openLink(p.link);}; td.appendChild(a); } else td.textContent='—';
         return td;
       },
       function(){
         var td=document.createElement('td'); td.className='clip';
-        if(p.igname){ var a=document.createElement('a'); a.href='https://'+(p.iglink||''); a.target='_blank'; a.style.cssText='color:var(--purple-text);text-decoration:none'; a.textContent=p.igname; a.onclick=function(e){e.stopPropagation();}; td.appendChild(a); } else td.textContent='—';
+        if(p.igname){ var a=document.createElement('span'); a.style.cssText='color:var(--purple-text);text-decoration:underline;cursor:pointer'; a.textContent=p.igname; a.onclick=function(e){e.stopPropagation();openLink(p.iglink||p.igname);}; td.appendChild(a); } else td.textContent='—';
         return td;
       },
       function(){
@@ -761,6 +767,7 @@ function renderAdminCards(pageIdx) {
   admins.forEach(function(a, ai) {
     var card = document.createElement('div'); card.className='admin-card';
     var fields = [
+      {l:'Tên FB',v:a.name||'—'},
       {l:'UID',v:a.uid},
       {l:'Link',v:a.link,isLink:true},
       {l:'Loại',v:a.type,isBadge:true},
@@ -775,7 +782,7 @@ function renderAdminCards(pageIdx) {
       var lbl = document.createElement('label'); lbl.textContent=f.l;
       fld.appendChild(lbl);
       if (f.isLink && f.v) {
-        var a2=document.createElement('a'); a2.href='https://'+f.v; a2.target='_blank'; a2.textContent=f.v; fld.appendChild(a2);
+        var a2=document.createElement('span'); a2.style.cssText='color:var(--blue-text);text-decoration:underline;cursor:pointer'; a2.textContent=f.v; a2.onclick=(function(url){ return function(){ openLink(url); }; })(f.v); fld.appendChild(a2);
       } else if (f.isBadge) {
         var bdg=document.createElement('span'); bdg.className='badge '+(f.v==='Acc đăng bài'?'b-blue':'b-purple'); bdg.style.fontSize='10px'; bdg.textContent=f.v||'—'; fld.appendChild(bdg);
       } else if (f.fullv) {
@@ -883,7 +890,7 @@ function populatePageBind(currentIdx) {
 function openAddAdmin(pageIdx) {
   editAccIdx=null; currentPageForAdmin={sheet:DB.activeSheet,pageIdx:pageIdx};
   document.getElementById('modal-admin-title').textContent='Thêm FB Admin';
-  ['fa-uid','fa-link','fa-pass','fa-2fa','fa-mail','fa-mailpass','fa-cookie'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['fa-uid','fa-name','fa-link','fa-pass','fa-2fa','fa-mail','fa-mailpass','fa-cookie'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('fa-type').value='Acc đăng bài';
   document.getElementById('uid-found-banner').style.display='none';
   document.getElementById('save-admin-btn').onclick=saveAdmin;
@@ -895,6 +902,7 @@ function openEditAdmin(pageIdx,adminIdx) {
   var a=DB.pages[DB.activeSheet][pageIdx].admins[adminIdx];
   document.getElementById('modal-admin-title').textContent='Sửa FB Admin';
   document.getElementById('fa-uid').value=a.uid||'';
+  document.getElementById('fa-name').value=a.name||'';
   document.getElementById('fa-link').value=a.link||'';
   document.getElementById('fa-type').value=a.type||'Acc đăng bài';
   document.getElementById('fa-pass').value=a.pass||'';
@@ -950,7 +958,7 @@ function saveAdmin() {
   var targetIdx=bindVal!==''?parseInt(bindVal):pageIdx;
   var page=DB.pages[sheet][targetIdx];
   if(!page.admins) page.admins=[];
-  var acc={uid:uid,link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,pass:document.getElementById('fa-pass').value,
+  var acc={uid:uid,name:document.getElementById('fa-name').value.trim(),link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,pass:document.getElementById('fa-pass').value,
     '2fa':document.getElementById('fa-2fa').value.trim(),cookie:document.getElementById('fa-cookie').value,mail:document.getElementById('fa-mail').value.trim(),mailpass:document.getElementById('fa-mailpass').value};
   if(editAccIdx!==null){
     DB.pages[sheet][pageIdx].admins[editAccIdx]=acc; syncAccGlobal(acc); showToast('Đã cập nhật admin','success');
@@ -1006,9 +1014,9 @@ function renderAccView(area) {
   var tw=document.createElement('div'); tw.className='table-wrap';
   var tbl=document.createElement('table');
   var thead=document.createElement('thead'); var htr=document.createElement('tr');
-  ['UID','Link FB','Pass','2FA','Cookie','Mail','Mk mail','Gắn page','Thao tác'].forEach(function(h,i){
+  ['Tên FB','UID','Link FB','Pass','2FA','Cookie','Mail','Mk mail','Gắn page','Thao tác'].forEach(function(h,i){
     var th=document.createElement('th'); th.textContent=h;
-    var ws=[100,140,70,60,120,140,70,0,62];
+    var ws=[100,90,120,70,60,110,130,70,0,62];
     if(ws[i]) th.style.width=ws[i]+'px';
     htr.appendChild(th);
   });
@@ -1043,9 +1051,10 @@ function renderAccRows(accs,type) {
       tr.appendChild(td); return td;
     }
 
+    var tdName=document.createElement('td'); tdName.textContent=a.name||'—'; tr.appendChild(tdName);
     var td0=document.createElement('td'); td0.style.cssText='font-family:var(--mono);font-weight:500'; td0.textContent=a.uid; tr.appendChild(td0);
     var td1=document.createElement('td'); td1.className='clip';
-    if(a.link){ var lnk=document.createElement('a'); lnk.href='https://'+a.link; lnk.target='_blank'; lnk.style.color='var(--blue-text)'; lnk.textContent=a.link; td1.appendChild(lnk); } else td1.textContent='—';
+    if(a.link){ var lnk=document.createElement('span'); lnk.style.cssText='color:var(--blue-text);text-decoration:underline;cursor:pointer'; lnk.textContent=a.link; lnk.onclick=(function(url){ return function(){ openLink(url); }; })(a.link); td1.appendChild(lnk); } else td1.textContent='—';
     tr.appendChild(td1);
     addTd(a.pass?'••••••••':'—',false,'color:var(--text3)');
     addTd(a['2fa']?'••••':'—',false,'color:var(--text3)');
@@ -1076,14 +1085,14 @@ function renderAccRows(accs,type) {
 
 function searchAccs(q,type) {
   q=q.toLowerCase();
-  var accs=DB.accs.filter(function(a){ return a.type===type&&(!q||a.uid.includes(q)||(a.mail||'').toLowerCase().includes(q)||(a.link||'').toLowerCase().includes(q)); });
+  var accs=DB.accs.filter(function(a){ return a.type===type&&(!q||a.uid.includes(q)||(a.name||'').toLowerCase().includes(q)||(a.mail||'').toLowerCase().includes(q)||(a.link||'').toLowerCase().includes(q)); });
   renderAccRows(accs,type);
 }
 
 function openAddAccDirect(type) {
   editAccIdx=null; currentPageForAdmin=null;
   document.getElementById('modal-admin-title').textContent='Thêm '+type;
-  ['fa-uid','fa-link','fa-pass','fa-2fa','fa-mail','fa-mailpass','fa-cookie'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['fa-uid','fa-name','fa-link','fa-pass','fa-2fa','fa-mail','fa-mailpass','fa-cookie'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('fa-type').value=type;
   document.getElementById('uid-found-banner').style.display='none';
   var sel=document.getElementById('fa-page-bind'); sel.innerHTML='';
@@ -1100,7 +1109,7 @@ function saveAccDirect() {
   var uid=document.getElementById('fa-uid').value.trim();
   if(!uid) return showToast('UID là bắt buộc','error');
   if(DB.accs.find(function(a){ return a.uid===uid; })) return showToast('UID này đã tồn tại','error');
-  var acc={uid:uid,link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,pass:document.getElementById('fa-pass').value,
+  var acc={uid:uid,name:document.getElementById('fa-name').value.trim(),link:document.getElementById('fa-link').value.trim(),type:document.getElementById('fa-type').value,pass:document.getElementById('fa-pass').value,
     '2fa':document.getElementById('fa-2fa').value.trim(),cookie:document.getElementById('fa-cookie').value,mail:document.getElementById('fa-mail').value.trim(),mailpass:document.getElementById('fa-mailpass').value};
   DB.accs.push(acc);
   var bv=document.getElementById('fa-page-bind').value;
@@ -1116,6 +1125,7 @@ function openEditAccGlobal(idx) {
   var a=DB.accs[idx];
   document.getElementById('modal-admin-title').textContent='Sửa tài khoản';
   document.getElementById('fa-uid').value=a.uid||'';
+  document.getElementById('fa-name').value=a.name||'';
   document.getElementById('fa-link').value=a.link||'';
   document.getElementById('fa-type').value=a.type||'Acc đăng bài';
   document.getElementById('fa-pass').value=a.pass||'';
